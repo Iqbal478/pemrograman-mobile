@@ -10,8 +10,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // <-- Tambahkan baris ini
-      title: 'Form Mahasiswa Validasi',
+      debugShowCheckedModeBanner: false, // <--- TAMBAHKAN BARIS INI
+      title: 'Form Validasi Mahasiswa',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
@@ -28,34 +28,33 @@ class FormMahasiswaPage extends StatefulWidget {
 }
 
 class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
-  // Key untuk Form Validation
+  int _currentStep = 0;
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers untuk Text Input
+  // Controllers untuk Input Text
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
-  // State Variables
-  int _currentStep = 0;
-  String? _selectedJurusan;
-  double _semester = 1.0;
-  bool _agree = false;
+  // Variables untuk Form Lainnya
+  String? _jurusan; // Dropdown
+  double _semester = 1.0; // Slider
+  bool _isAgreed = false; // Switch
 
-  // Data Hobi (Map untuk menyimpan status checkbox)
+  // Data Hobi (Checkbox)
   final Map<String, bool> _hobbies = {
     'Membaca': false,
     'Olahraga': false,
-    'Coding': false,
     'Musik': false,
+    'Traveling': false,
   };
 
-  // List Pilihan Jurusan
+  // List Jurusan untuk Dropdown
   final List<String> _jurusanList = [
     'Teknik Informatika',
     'Sistem Informasi',
-    'Ilmu Komputer',
-    'Teknologi Informasi'
+    'Desain Komunikasi Visual',
+    'Manajemen Bisnis',
   ];
 
   @override
@@ -66,11 +65,11 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
     super.dispose();
   }
 
-  // Fungsi untuk submit form
+  // Fungsi Submit
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
-      // Validasi manual untuk Hobi (minimal 1 dipilih)
-      if (!_hobbies.containsValue(true)) {
+      // Validasi Manual untuk Hobi (karena Checkbox tidak punya validator bawaan di FormField biasa)
+      if (!_hobbies.values.contains(true)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Pilih setidaknya satu hobi!'),
@@ -80,22 +79,30 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
         return;
       }
 
-      // Validasi manual untuk Switch Persetujuan
-      if (!_agree) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Anda harus menyetujui persyaratan!'),
-            backgroundColor: Colors.red,
+      // Tampilkan Hasil
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Data Berhasil Disimpan'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: [
+                Text('Nama: ${_namaController.text}'),
+                Text('Email: ${_emailController.text}'),
+                Text('No HP: ${_phoneController.text}'),
+                Text('Jurusan: $_jurusan'),
+                Text('Semester: ${_semester.toInt()}'),
+                Text('Hobi: ${_hobbies.keys.where((k) => _hobbies[k]!).join(', ')}'),
+                Text('Status: ${_isAgreed ? "Setuju" : "Tidak Setuju"}'),
+              ],
+            ),
           ),
-        );
-        return;
-      }
-
-      // Jika semua valid
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Data Mahasiswa Berhasil Disimpan!'),
-          backgroundColor: Colors.green,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
     }
@@ -116,47 +123,61 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
           currentStep: _currentStep,
           onStepTapped: (step) => setState(() => _currentStep = step),
           onStepContinue: () {
-            // Logika tombol Lanjut / Simpan
-            if (_currentStep < 2) {
-              setState(() => _currentStep += 1);
-            } else {
-              _submitForm();
+            // Logika Validasi per Step
+            bool isStepValid = true;
+
+            if (_currentStep == 0) {
+              // Validasi Step 1: Text Fields
+              if (_namaController.text.isEmpty ||
+                  _emailController.text.isEmpty ||
+                  !_emailController.text.contains('@') ||
+                  _phoneController.text.isEmpty) {
+                isStepValid = false;
+                _formKey.currentState!.validate(); // Trigger pesan error merah muncul
+              }
+            } else if (_currentStep == 1) {
+              // Validasi Step 2: Dropdown & Hobi
+              if (_jurusan == null) {
+                isStepValid = false;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Harap pilih jurusan!')),
+                );
+              } else if (!_hobbies.values.contains(true)) {
+                isStepValid = false;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Pilih minimal satu hobi!')),
+                );
+              }
+            } else if (_currentStep == 2) {
+              // Validasi Step 3: Switch Agreement
+              if (!_isAgreed) {
+                isStepValid = false;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Anda harus menyetujui syarat & ketentuan!')),
+                );
+              }
+            }
+
+            if (isStepValid) {
+              if (_currentStep < 2) {
+                setState(() => _currentStep += 1);
+              } else {
+                _submitForm();
+              }
             }
           },
           onStepCancel: () {
-            // Logika tombol Kembali
             if (_currentStep > 0) {
               setState(() => _currentStep -= 1);
             }
           },
-          controlsBuilder: (context, details) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 20.0),
-              child: Row(
-                children: [
-                  ElevatedButton(
-                    onPressed: details.onStepContinue,
-                    child: Text(_currentStep == 2 ? 'Simpan' : 'Lanjut'),
-                  ),
-                  const SizedBox(width: 10),
-                  if (_currentStep > 0)
-                    OutlinedButton(
-                      onPressed: details.onStepCancel,
-                      child: const Text('Kembali'),
-                    ),
-                ],
-              ),
-            );
-          },
           steps: [
-            // STEP 1: Identitas Diri (Nama, Email, No HP)
+            // STEP 1: Data Pribadi
             Step(
-              title: const Text('Identitas Diri'),
+              title: const Text('Data Pribadi'),
               isActive: _currentStep >= 0,
-              state: _currentStep > 0 ? StepState.complete : StepState.editing,
               content: Column(
                 children: [
-                  // Field Nama
                   TextFormField(
                     controller: _namaController,
                     decoration: const InputDecoration(
@@ -165,35 +186,26 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Nama wajib diisi';
-                      }
+                      if (value == null || value.isEmpty) return 'Nama wajib diisi';
                       return null;
                     },
                   ),
                   const SizedBox(height: 10),
-                  
-                  // Field Email
                   TextFormField(
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       labelText: 'Email',
                       prefixIcon: Icon(Icons.email),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Email wajib diisi';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Format email tidak valid';
-                      }
+                      if (value == null || value.isEmpty) return 'Email wajib diisi';
+                      if (!value.contains('@')) return 'Format email tidak valid';
                       return null;
                     },
                   ),
                   const SizedBox(height: 10),
-
-                  // Field Nomor HP
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
@@ -203,13 +215,10 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Nomor HP wajib diisi';
-                      }
-                      // Cek apakah hanya angka
-                      if (double.tryParse(value) == null) {
-                        return 'Hanya boleh angka';
-                      }
+                      if (value == null || value.isEmpty) return 'Nomor HP wajib diisi';
+                      if (value.length < 10) return 'Nomor HP minimal 10 digit';
+                      // Cek apakah angka semua
+                      if (double.tryParse(value) == null) return 'Hanya boleh angka';
                       return null;
                     },
                   ),
@@ -217,11 +226,10 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
               ),
             ),
 
-            // STEP 2: Data Akademik (Jurusan, Semester)
+            // STEP 2: Data Akademik & Minat
             Step(
-              title: const Text('Data Akademik'),
+              title: const Text('Akademik & Minat'),
               isActive: _currentStep >= 1,
-              state: _currentStep > 1 ? StepState.complete : StepState.editing,
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -231,54 +239,35 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
                       labelText: 'Jurusan',
                       border: OutlineInputBorder(),
                     ),
-                    value: _selectedJurusan,
-                    items: _jurusanList.map((String jurusan) {
-                      return DropdownMenuItem(
-                        value: jurusan,
-                        child: Text(jurusan),
-                      );
-                    }).toList(),
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedJurusan = newValue;
-                      });
-                    },
+                    value: _jurusan,
+                    items: _jurusanList
+                        .map((jurusan) => DropdownMenuItem(
+                              value: jurusan,
+                              child: Text(jurusan),
+                            ))
+                        .toList(),
+                    onChanged: (value) => setState(() => _jurusan = value),
                     validator: (value) =>
                         value == null ? 'Jurusan wajib dipilih' : null,
                   ),
                   const SizedBox(height: 20),
 
                   // Slider Semester
-                  const Text('Semester Saat Ini:',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('Semester: ${_semester.toInt()}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   Slider(
                     value: _semester,
                     min: 1,
                     max: 8,
                     divisions: 7,
-                    label: _semester.round().toString(),
-                    onChanged: (double value) {
-                      setState(() {
-                        _semester = value;
-                      });
-                    },
+                    label: _semester.toInt().toString(),
+                    onChanged: (value) => setState(() => _semester = value),
                   ),
-                  Center(child: Text('Semester ${_semester.round()}')),
-                ],
-              ),
-            ),
+                  const SizedBox(height: 10),
 
-            // STEP 3: Minat & Persetujuan (Hobi, Switch)
-            Step(
-              title: const Text('Minat & Persetujuan'),
-              isActive: _currentStep >= 2,
-              state: _currentStep == 2 ? StepState.editing : StepState.indexed,
-              content: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Pilih Hobi (Minimal 1):',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
                   // Checkbox Hobi
+                  const Text('Hobi (Pilih Minimal 1):',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   ..._hobbies.keys.map((String key) {
                     return CheckboxListTile(
                       title: Text(key),
@@ -290,26 +279,35 @@ class _FormMahasiswaPageState extends State<FormMahasiswaPage> {
                       },
                     );
                   }).toList(),
-                  const Divider(),
-                  
-                  // Switch Persetujuan
+                ],
+              ),
+            ),
+
+            // STEP 3: Konfirmasi
+            Step(
+              title: const Text('Persetujuan'),
+              isActive: _currentStep >= 2,
+              content: Column(
+                children: [
+                  const Text(
+                    'Pastikan semua data yang Anda masukkan sudah benar. Dengan menekan tombol setuju, Anda bertanggung jawab atas keaslian data.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
                   SwitchListTile(
                     title: const Text('Saya menyetujui syarat & ketentuan'),
-                    value: _agree,
+                    value: _isAgreed,
                     onChanged: (bool value) {
                       setState(() {
-                        _agree = value;
+                        _isAgreed = value;
                       });
                     },
                   ),
-                  if (!_agree)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 16.0),
-                      child: Text(
-                        'Wajib disetujui',
-                        style: TextStyle(color: Colors.red, fontSize: 12),
-                      ),
-                    ),
+                  if (!_isAgreed)
+                    const Text(
+                      ' * Wajib disetujui',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
+                    )
                 ],
               ),
             ),
